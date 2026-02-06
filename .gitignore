@@ -1,0 +1,4 @@
+*.bak
+.last_device.json
+__pycache__/
+
