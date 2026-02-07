@@ -1,4 +1,4 @@
 *.bak
 .last_device.json
 __pycache__/
-
+.uv-cache/

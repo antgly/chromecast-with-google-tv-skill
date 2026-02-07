@@ -9,10 +9,10 @@ Use this skill when I ask to cast YouTube or Tubi video content, play or pause C
 
 ## Setup
 
-This skill runs with system `python3` and `adb` on PATH. No venv required.
+This skill runs with `uv` and `adb` on PATH. No venv required.
 
-- Ensure `python3` and `adb` are available on PATH.
-- Use `./run` as a convenience wrapper around `python3 google_tv_skill.py`.
+- Ensure `uv` and `adb` are available on PATH.
+- Use `./run` as a convenience wrapper around `uv run google_tv_skill.py`.
 
 ## Capabilities
 
@@ -62,7 +62,8 @@ This skill provides a small CLI wrapper around ADB to control a Google TV device
 ### Dependencies
 
 - The script uses only the Python standard library (no pip packages required).
-- The script expects `adb` and `yt-api` to be installed and available on PATH.
+- The scripts run through `uv` to avoid PEP 668/system package constraints.
+- The script expects `adb`, `uv`, and `yt-api` to be installed and available on PATH.
 
 ### Caching and non-destructive defaults
 
@@ -76,6 +77,6 @@ This skill provides a small CLI wrapper around ADB to control a Google TV device
 
 ## Implementation notes
 
-- The skill CLI code lives in `google_tv_skill.py` in this folder. It uses subprocess calls to `adb` and to `yt-api` when needed.
+- The skill CLI code lives in `google_tv_skill.py` in this folder. It uses subprocess calls to `adb`, `yt-api`, and `uv run play_show_via_global_search.py` for fallback playback.
 - For Tubi URL discovery, the assistant can use web_search to find canonical Tubi pages and pass the https URL to the skill.
 

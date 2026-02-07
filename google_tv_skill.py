@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
+
 """
 google_tv_skill.py
 
@@ -11,7 +16,7 @@ Usage:
   ./google_tv_skill.py resume [--device IP] [--port PORT]
 
 Notes:
-- Requires python3 on PATH; no venv required.
+- Requires uv and adb on PATH; no venv required.
 - Caches last successful IP:PORT to .last_device.json in the skill folder.
 - Does NOT perform port scanning. It will attempt the explicit port passed or cached one.
 - YouTube: prefers resolving to a video ID using the yt-api CLI (calls `yt-api` on PATH). If an ID is obtained, it launches the YouTube app via ADB intent restricted to the YouTube package.
@@ -33,6 +38,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Iterable, Optional, Sequence, Tuple
 from urllib.parse import parse_qs, urlparse
@@ -84,6 +90,9 @@ def save_cache(ip: str, port: int):
 
 def adb_available() -> bool:
     return bool(shutil.which('adb'))
+
+def uv_available() -> bool:
+    return bool(shutil.which('uv'))
 
 def is_youtube_id(value: str) -> bool:
     return bool(YOUTUBE_ID_RE.fullmatch(value or ''))
@@ -520,6 +529,9 @@ def main(argv=None):
             except Exception:
                 pass
 
+    if not uv_available():
+        print('uv not found on PATH. Install uv and run again.')
+        return 2
     if not adb_available():
         print('adb not found on PATH. Install Android platform-tools and ensure adb is available.')
         return 2

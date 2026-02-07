@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 is required. Please install Python 3 and ensure it is on PATH."
+if ! command -v uv >/dev/null 2>&1; then
+  echo "uv is required. Please install uv and ensure it is on PATH."
   exit 127
 fi
 if ! command -v adb >/dev/null 2>&1; then
@@ -11,5 +11,4 @@ if ! command -v adb >/dev/null 2>&1; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 "${SCRIPT_DIR}/google_tv_skill.py" "$@"
-
+exec uv run "${SCRIPT_DIR}/google_tv_skill.py" "$@"
