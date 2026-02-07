@@ -232,11 +232,12 @@ def launch_global_search_show(
         app_name,
     ]
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True)
+        p = subprocess.run(cmd, timeout=180)
+    except subprocess.TimeoutExpired:
+        return False, 'Global search helper timed out after 180 seconds'
     except Exception as e:
         return False, str(e)
-    output = ((p.stdout or '') + (p.stderr or '')).strip()
-    return p.returncode == 0, output
+    return p.returncode == 0, ''
 
 def adb_connect(
     ip: str,
