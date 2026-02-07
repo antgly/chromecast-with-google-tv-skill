@@ -1,7 +1,7 @@
 ---
 name: chromecast-with-google-tv
 description: Cast YouTube videos, Tubi TV show episodes, and TV show episodes from other video streaming apps via ADB to Chromecast with Android TV (Chromecast 4K supported, Google TV Streamer support is unknown)
-metadata: {"openclaw":{"os":["darwin","linux"],"requires":{"bins":["adb","uv"]},"install":[{"id":"brew-adb","kind":"brew","cask":"android-platform-tools","bins":["adb"],"label":"Install adb (android-platform-tools)"},{"id":"brew-uv","kind":"brew","formula":"uv","bins":["uv"],"label":"Install uv"}]}}
+metadata: {"openclaw":{"os":["darwin","linux"],"requires":{"bins":["adb","scrcpy","uv"]},"install":[{"id":"brew-adb","kind":"brew","cask":"android-platform-tools","bins":["adb"],"label":"Install adb (android-platform-tools)"},{"id":"brew-scrcpy","kind":"brew","formula":"scrcpy","bins":["scrcpy"],"label":"Install scrcpy"},{"id":"brew-uv","kind":"brew","formula":"uv","bins":["uv"],"label":"Install uv"}]}}
 ---
 
 # Chromecast with Google TV control
@@ -10,9 +10,9 @@ Use this skill when I ask to cast YouTube or Tubi video content, play or pause C
 
 ## Setup
 
-This skill runs with `uv` and `adb` on PATH. No venv required.
+This skill runs with `uv`, `adb`, and `scrcpy` on PATH. No venv required.
 
-- Ensure `uv` and `adb` are available on PATH.
+- Ensure `uv`, `adb`, and `scrcpy` are available on PATH.
 - Use `./run` as a convenience wrapper around `uv run google_tv_skill.py`.
 
 ## Capabilities
@@ -59,6 +59,7 @@ This skill provides a small CLI wrapper around ADB to control a Google TV device
 
 - If YouTube/Tubi resolution does not apply and you pass `--app` with another provider (for example `hulu`, `max`, `disney+`), the skill uses a Google TV global-search fallback.
 - For this fallback, pass all three: `--app`, `--season`, and `--episode`.
+- `scrcpy` must be installed and available on PATH for this flow.
 - The fallback starts `android.search.action.GLOBAL_SEARCH`, waits for the Series Overview UI, opens Seasons, picks season/episode, then confirms `Open in <app>` when available.
 - Hulu profile-selection logic is intentionally not handled here.
 
@@ -71,7 +72,7 @@ This skill provides a small CLI wrapper around ADB to control a Google TV device
 
 - The script uses only the Python standard library (no pip packages required).
 - The scripts run through `uv` to avoid PEP 668/system package constraints.
-- The script expects `adb`, `uv`, and `yt-api` to be installed and available on PATH.
+- The script expects `adb`, `scrcpy`, `uv`, and `yt-api` to be installed and available on PATH.
 
 ### Caching and non-destructive defaults
 
@@ -85,5 +86,5 @@ This skill provides a small CLI wrapper around ADB to control a Google TV device
 
 ## Implementation notes
 
-- The skill CLI code lives in `google_tv_skill.py` in this folder. It uses subprocess calls to `adb` and `yt-api`, plus an internal global-search helper for fallback playback.
+- The skill CLI code lives in `google_tv_skill.py` in this folder. It uses subprocess calls to `adb`, `scrcpy`, and `yt-api`, plus an internal global-search helper for fallback playback.
 - For Tubi URL discovery, the assistant can use web_search to find canonical Tubi pages and pass the https URL to the skill.
