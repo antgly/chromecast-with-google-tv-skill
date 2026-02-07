@@ -1,6 +1,7 @@
 ---
 name: google-tv
 description: Play YouTube/Tubi content and fallback to Google TV global search for other streaming apps via ADB
+metadata: {"openclaw":{"os":["darwin","linux"],"requires":{"bins":["adb","uv"]},"install":[{"id":"brew-adb","kind":"brew","cask":"android-platform-tools","bins":["adb"],"label":"Install adb (android-platform-tools)"},{"id":"brew-uv","kind":"brew","formula":"uv","bins":["uv"],"label":"Install uv"}]}}
 ---
 
 # Chromecast with Google TV control
