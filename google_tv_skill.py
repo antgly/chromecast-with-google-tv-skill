@@ -39,7 +39,6 @@ import argparse
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -263,8 +262,6 @@ def adb_connect(
         if attempt < attempts:
             backoff = 0.5 * (2 ** (attempt - 1))
             try:
-                import time
-
                 time.sleep(backoff)
             except Exception:
                 pass
@@ -446,7 +443,6 @@ def resolve_youtube_id_with_yt_api(query: str) -> Optional[str]:
         try:
             p = subprocess.run([bin_path, 'search', query], capture_output=True, text=True, timeout=15)
             out = (p.stdout or '').strip()
-            err = (p.stderr or '').strip()
             if p.returncode != 0:
                 continue
             if not out:
@@ -639,4 +635,3 @@ def main(argv=None):
 
 if __name__ == '__main__':
     raise SystemExit(main())
-
