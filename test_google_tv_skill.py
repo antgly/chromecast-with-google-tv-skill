@@ -406,3 +406,52 @@ class TestConnectionRefusedDetection(unittest.TestCase):
         self.assertFalse(connection_refused("timeout"))
         self.assertFalse(connection_refused("device offline"))
         self.assertFalse(connection_refused(""))
+
+
+class TestCacheOperations(unittest.TestCase):
+    """Test cache file operations."""
+
+    def setUp(self):
+        """Create temporary directory for cache testing."""
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.cache_file = Path(self.temp_dir.name) / '.last_device.json'
+
+    def tearDown(self):
+        """Clean up temporary directory."""
+        self.temp_dir.cleanup()
+
+    def test_save_and_load_cache(self):
+        """Test saving and loading cache."""
+        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
+            save_cache("192.168.4.64", 5555)
+            cache = load_cache()
+            self.assertIsNotNone(cache)
+            self.assertEqual(cache['ip'], "192.168.4.64")
+            self.assertEqual(cache['port'], 5555)
+
+    def test_load_cache_nonexistent(self):
+        """Test loading cache when file doesn't exist."""
+        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
+            cache = load_cache()
+            self.assertIsNone(cache)
+
+    def test_load_cache_invalid_json(self):
+        """Test loading cache with invalid JSON."""
+        self.cache_file.write_text("not json")
+        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
+            cache = load_cache()
+            self.assertIsNone(cache)
+
+    def test_load_cache_missing_fields(self):
+        """Test loading cache with missing required fields."""
+        self.cache_file.write_text(json.dumps({"ip": "192.168.4.64"}))
+        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
+            cache = load_cache()
+            self.assertIsNone(cache)
+
+    def test_load_cache_invalid_port(self):
+        """Test loading cache with non-integer port."""
+        self.cache_file.write_text(json.dumps({"ip": "192.168.4.64", "port": "not-a-number"}))
+        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
+            cache = load_cache()
+            self.assertIsNone(cache)
