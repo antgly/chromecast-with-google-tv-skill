@@ -489,3 +489,46 @@ class TestPackageNames(unittest.TestCase):
         with patch.dict(os.environ, {"TUBI_PACKAGE": "com.custom.tubi"}):
             pkg = tubi_package()
             self.assertEqual(pkg, "com.custom.tubi")
+
+
+class TestVideoIDFinding(unittest.TestCase):
+    """Test recursive video ID extraction from JSON-like structures."""
+
+    def test_find_video_id_direct_key(self):
+        """Test finding videoId in dict."""
+        data = {"videoId": "7m714Ls29ZA", "title": "example"}
+        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
+
+    def test_find_video_id_underscore_key(self):
+        """Test finding video_id in dict."""
+        data = {"video_id": "7m714Ls29ZA"}
+        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
+
+    def test_find_video_id_nested_dict(self):
+        """Test finding videoId in nested dict."""
+        data = {"data": {"videoId": "7m714Ls29ZA"}}
+        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
+
+    def test_find_video_id_in_list(self):
+        """Test finding videoId in list of dicts."""
+        data = [{"title": "a"}, {"videoId": "7m714Ls29ZA"}]
+        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
+
+    def test_find_video_id_not_found(self):
+        """Test that None is returned when no videoId found."""
+        data = {"title": "example", "url": "https://example.com"}
+        self.assertIsNone(find_video_id(data))
+
+    def test_find_video_id_ignores_invalid_ids(self):
+        """Test that invalid IDs are skipped."""
+        data = {"videoId": "abc", "id": "7m714Ls29ZA"}
+        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
+
+    def test_find_video_id_empty_structures(self):
+        """Test with empty structures."""
+        self.assertIsNone(find_video_id({}))
+        self.assertIsNone(find_video_id([]))
+
+
+if __name__ == '__main__':
+    unittest.main()
