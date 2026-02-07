@@ -26,8 +26,14 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
+# Force unbuffered stdout so prints appear immediately when piped
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+
 # Constants
 ADB_TIMEOUT_SECONDS = 10
+ADB_DUMP_RETRIES = 3
+ADB_DUMP_RETRY_SLEEP = 1.0
 KEYCODE_DOWN = "20"
 KEYCODE_LEFT = "21"
 KEYCODE_RIGHT = "22"
@@ -57,25 +63,22 @@ def find_binary(name):
 
 SCRCPY_PATH = find_binary("scrcpy")
 
-def run_adb(args, device=None):
-    """Execute adb command. Assumes adb is on PATH (verified by caller)."""
+def run_adb(args, device=None, timeout=ADB_TIMEOUT_SECONDS):
+    """Execute adb command. Returns output string; returns error string on failure instead of exiting."""
     cmd = ['adb']
     if device:
         cmd += ['-s', device]
     cmd += list(args)
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=ADB_TIMEOUT_SECONDS)
-        out = (p.stdout or '') + (p.stderr or '')
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        out = ((p.stdout or '') + (p.stderr or '')).strip()
         if p.returncode != 0:
-            print(f"[!] ADB Error: {out.strip()}")
-            sys.exit(1)
-        return out.strip()
+            return f"[ADB ERR rc={p.returncode}] {out}"
+        return out
     except subprocess.TimeoutExpired:
-        print("[!] ADB command timed out")
-        sys.exit(1)
+        return "[ADB TIMEOUT]"
     except Exception as e:
-        print(f"[!] Command error: {str(e)}")
-        sys.exit(1)
+        return f"[ADB EXC] {str(e)}"
 
 def launch_scrcpy(device):
     if not SCRCPY_PATH:
@@ -89,9 +92,23 @@ def dump_screen(device):
     local_path = "/tmp/os_dump.xml"
     if os.path.exists(local_path):
         os.remove(local_path)
-    run_adb(["shell", "uiautomator", "dump", "/sdcard/window_dump.xml"], device)
-    run_adb(["pull", "/sdcard/window_dump.xml", local_path], device)
-    return local_path if os.path.exists(local_path) else None
+    for attempt in range(1, ADB_DUMP_RETRIES + 1):
+        # Kill any stale uiautomator processes that may block new dumps
+        run_adb(["shell", "killall", "uiautomator"], device, timeout=3)
+        print(f"  [DEBUG] uiautomator dump attempt {attempt}/{ADB_DUMP_RETRIES}...")
+        # Use device-side timeout to prevent uiautomator from hanging
+        out1 = run_adb(["shell", "timeout", "5", "uiautomator", "dump", "/sdcard/window_dump.xml"], device, timeout=8)
+        print(f"  [DEBUG] dump result: {out1}")
+        if "[ADB TIMEOUT]" in out1 or "[ADB ERR" in out1:
+            print(f"  [DEBUG] dump failed, retrying...")
+            time.sleep(ADB_DUMP_RETRY_SLEEP)
+            continue
+        out2 = run_adb(["pull", "/sdcard/window_dump.xml", local_path], device)
+        if os.path.exists(local_path):
+            return local_path
+        time.sleep(ADB_DUMP_RETRY_SLEEP)
+    print(f"  [!] Failed to dump screen after {ADB_DUMP_RETRIES} attempts.")
+    return None
 
 def parse_screen_nodes(device):
     """Parse UI hierarchy and yield node information."""
@@ -207,13 +224,19 @@ def main():
     scrcpy_proc = launch_scrcpy(device)
 
     try:
-        # 1. Global Search
+        # 1. Global Search — open text search UI, type query, select result
         print("[Step 1] Global Search...")
-        run_adb([
-            "shell", "am", "start",
-            "-a", "android.search.action.GLOBAL_SEARCH",
-            "-e", "query", args.show
-        ], device)
+        # KEYCODE_SEARCH opens Google TV's text-based search (not voice assistant)
+        run_adb(["shell", "input", "keyevent", "KEYCODE_SEARCH"], device)
+        time.sleep(2)
+        # Type the show name into the search field (%s = space in ADB input text)
+        safe_text = args.show.replace(" ", "%s")
+        run_adb(["shell", "input", "text", safe_text], device)
+        time.sleep(1)
+        # Press Enter to submit the search
+        run_adb(["shell", "input", "keyevent", KEYCODE_ENTER], device)
+        # Give the search results time to load
+        time.sleep(VIEW_TRANSITION_WAIT)
 
         print(f">>> SELECT '{args.show}' IN SCRCPY IF NEEDED. "
               "Waiting for Series Overview... <<<")
