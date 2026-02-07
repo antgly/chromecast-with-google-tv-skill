@@ -375,3 +375,34 @@ class TestTubiDetection(unittest.TestCase):
     def test_tubi_case_insensitive(self):
         """Test that Tubi detection is case-insensitive."""
         self.assertTrue(looks_like_tubi("HTTPS://WWW.TUBITV.COM/"))
+
+
+class TestConnectionRefusedDetection(unittest.TestCase):
+    """Test connection refused detection logic."""
+
+    def test_connection_refused_exact(self):
+        """Test detection of 'connection refused' message."""
+        self.assertTrue(connection_refused("connection refused"))
+
+    def test_refused_keyword(self):
+        """Test detection of 'refused' keyword."""
+        self.assertTrue(connection_refused("adb: unable to connect to 192.168.1.1:5555: refused"))
+
+    def test_failed_to_connect(self):
+        """Test detection of 'failed to connect' message."""
+        self.assertTrue(connection_refused("failed to connect to device"))
+
+    def test_cannot_connect(self):
+        """Test detection of 'cannot connect' message."""
+        self.assertTrue(connection_refused("cannot connect to device"))
+
+    def test_case_insensitive(self):
+        """Test that detection is case-insensitive."""
+        self.assertTrue(connection_refused("CONNECTION REFUSED"))
+        self.assertTrue(connection_refused("Failed To Connect"))
+
+    def test_not_connection_refused(self):
+        """Test that other errors are not detected as refused."""
+        self.assertFalse(connection_refused("timeout"))
+        self.assertFalse(connection_refused("device offline"))
+        self.assertFalse(connection_refused(""))
