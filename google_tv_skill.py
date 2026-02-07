@@ -22,6 +22,11 @@ Notes:
 - YouTube: prefers resolving to a video ID using the yt-api CLI (calls `yt-api` on PATH). If an ID is obtained, it launches the YouTube app via ADB intent restricted to the YouTube package.
 - Tubi: expects an https URL. The script will attempt a VIEW https intent restricted to the Tubi package.
 
+Architecture:
+- All ADB connection management and device discovery happens here.
+- The global-search fallback (play_show_via_global_search.py) is a helper that receives an already-connected device address.
+- The fallback only orchestrates UI automation via pre-established ADB connection.
+
 Exit codes:
   0 success
   2 adb connect/connection error
@@ -232,6 +237,18 @@ def adb_connect(
                 pass
     return False, last_out
 
+def discover_mdns_device() -> Optional[dict]:
+    code, out = run_adb(['mdns', 'services'])
+    if code != 0:
+        return None
+    match = re.search(r'(\d+\.\d+\.\d+\.\d+):(\d+)', out)
+    if not match:
+        return None
+    try:
+        return {'ip': match.group(1), 'port': int(match.group(2))}
+    except Exception:
+        return None
+
 def connection_refused(message: str) -> bool:
     if not message:
         return False
@@ -293,12 +310,30 @@ def ensure_connected(ip: Optional[str], port: Optional[int]) -> Tuple[Optional[s
             ip = cache['ip']
             port = cache['port']
         else:
-            return None, 'no device specified and no cached device found'
+            mdns_device = discover_mdns_device()
+            if mdns_device:
+                ip = mdns_device['ip']
+                port = mdns_device['port']
+            else:
+                return None, 'no device specified and no cached device found'
 
     ok, out = adb_connect(ip, port)
     if ok:
         save_cache(ip, port)
         return f"{ip}:{port}", None
+
+    # If connection failed and looks like a refused/timeout error, try mDNS rediscovery
+    # before prompting the user. This handles cases where the device moved to a new IP
+    # (e.g., after router restart or network change).
+    if connection_refused(out):
+        mdns_device = discover_mdns_device()
+        if mdns_device:
+            mdns_ip = mdns_device['ip']
+            mdns_port = mdns_device['port']
+            ok_mdns, out_mdns = adb_connect(mdns_ip, mdns_port)
+            if ok_mdns:
+                save_cache(mdns_ip, mdns_port)
+                return f"{mdns_ip}:{mdns_port}", None
 
     prompted_device, prompt_err = try_prompt_new_port(ip, out)
     if prompted_device:
@@ -310,6 +345,17 @@ def ensure_connected(ip: Optional[str], port: Optional[int]) -> Tuple[Optional[s
         ok2, out2 = adb_connect(cache['ip'], cache['port'])
         if ok2:
             return f"{cache['ip']}:{cache['port']}", None
+
+        # For cached fallback, also try mDNS rediscovery if connection refused
+        if connection_refused(out2):
+            mdns_device = discover_mdns_device()
+            if mdns_device:
+                mdns_ip = mdns_device['ip']
+                mdns_port = mdns_device['port']
+                ok_mdns, out_mdns = adb_connect(mdns_ip, mdns_port)
+                if ok_mdns:
+                    save_cache(mdns_ip, mdns_port)
+                    return f"{mdns_ip}:{mdns_port}", None
 
         prompted_device, prompt_err = try_prompt_new_port(cache['ip'], out2)
         if prompted_device:
