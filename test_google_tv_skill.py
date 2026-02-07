@@ -343,3 +343,35 @@ class TestYouTubeIDValidation(unittest.TestCase):
     def test_invalid_id_empty(self):
         """Test that empty string is invalid."""
         self.assertFalse(is_youtube_id(""))
+
+
+class TestTubiDetection(unittest.TestCase):
+    """Test Tubi URL detection logic."""
+
+    def test_tubi_https_url(self):
+        """Test detection of Tubi https URL."""
+        self.assertTrue(looks_like_tubi("https://www.tubitv.com/movies/123"))
+        self.assertTrue(looks_like_tubi("https://tubitv.com/movies/123"))
+
+    def test_tubi_without_https(self):
+        """Test detection of Tubi URL without https."""
+        self.assertTrue(looks_like_tubi("www.tubitv.com/movies/123"))
+        self.assertTrue(looks_like_tubi("tubitv.com/movies/123"))
+
+    def test_tubi_partial_match(self):
+        """Test that partial 'tubitv.com' in string is detected."""
+        self.assertTrue(looks_like_tubi("watch on tubitv.com here"))
+
+    def test_non_tubi_url(self):
+        """Test that non-Tubi URLs are rejected."""
+        self.assertFalse(looks_like_tubi("https://youtube.com"))
+        self.assertFalse(looks_like_tubi("https://hulu.com"))
+
+    def test_empty_tubi_input(self):
+        """Test that empty input returns False."""
+        self.assertFalse(looks_like_tubi(""))
+        self.assertFalse(looks_like_tubi(None))
+
+    def test_tubi_case_insensitive(self):
+        """Test that Tubi detection is case-insensitive."""
+        self.assertTrue(looks_like_tubi("HTTPS://WWW.TUBITV.COM/"))
