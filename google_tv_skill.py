@@ -206,6 +206,39 @@ def youtube_package() -> str:
 def tubi_package() -> str:
     return (os.environ.get('TUBI_PACKAGE') or DEFAULT_TUBI_PACKAGE).strip()
 
+def launch_global_search_show(
+    show: str,
+    season: int,
+    episode: int,
+    app_name: str,
+    device: str,
+) -> Tuple[bool, str]:
+    """Launch global-search fallback with pre-verified device connection.
+    
+    Passes the already-connected device address to the fallback helper.
+    The helper only orchestrates UI automation; all ADB connection logic
+    remains in google_tv_skill.py.
+    """
+    script_path = SKILL_DIR / 'play_show_via_global_search.py'
+    cmd = [
+        'uv',
+        'run',
+        str(script_path),
+        show,
+        str(season),
+        str(episode),
+        '--device',
+        device,
+        '--app',
+        app_name,
+    ]
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True)
+    except Exception as e:
+        return False, str(e)
+    output = ((p.stdout or '') + (p.stderr or '')).strip()
+    return p.returncode == 0, output
+
 def adb_connect(
     ip: str,
     port: int,
@@ -452,20 +485,21 @@ def looks_like_tubi(term: str) -> bool:
         return False
     value = term.strip().lower()
     return (
-        value.isdigit()
-        or value.startswith(TUBI_SCHEME_PREFIX)
-        or value.startswith('tubitv')
+        value.startswith('https://www.tubitv.com/')
+        or value.startswith('https://tubitv.com/')
+        or value.startswith('www.tubitv.com/')
+        or value.startswith('tubitv.com/')
         or 'tubitv.com' in value
     )
 
 def handle_tubi(device: str, term: str) -> Tuple[bool, str]:
-    if term.startswith('http'):
+    if term.startswith('https://'):
         return adb_intent_view(device, term, tubi_package())
 
     if term.startswith('tubitv.com') or term.startswith('www.tubitv.com'):
         return adb_intent_view(device, f'https://{term}', tubi_package())
 
-    return False, 'Tubi term is not a URL; provide a Tubi TV URL.'
+    return False, 'Tubi term must be an https Tubi URL.'
 
 
 def play_cmd(args) -> int:
@@ -474,9 +508,8 @@ def play_cmd(args) -> int:
         print(err)
         return 2
     query = args.query.strip()
-    app_hint = (args.app or '').strip().lower()
-    if app_hint and app_hint not in {'youtube', 'tubi'}:
-        app_hint = ''
+    app_raw = (args.app or '').strip()
+    app_hint = app_raw.lower()
 
     if app_hint == 'tubi':
         ok, out = handle_tubi(device, query)
@@ -523,7 +556,19 @@ def play_cmd(args) -> int:
         print('adb intent failed:', out)
         return 4
 
+    if app_raw and app_hint not in {'youtube', 'tubi'}:
+        if args.season is None or args.episode is None:
+            print('for non-youtube/tubi fallback, pass --season and --episode')
+            return 1
+        ok, out = launch_global_search_show(query, args.season, args.episode, app_raw, device)
+        if ok:
+            print('launched global-search fallback')
+            return 0
+        print('global-search fallback failed:', out)
+        return 4
+
     print('failed to resolve YouTube ID for query')
+    print('for non-youtube/tubi content, pass --app "<streaming app>" --season N --episode N')
     return 3
 
 def build_parser():
@@ -539,7 +584,9 @@ def build_parser():
     sp_play.add_argument('query', help='Query, YouTube id, or provider-specific id/url')
     sp_play.add_argument('--device', dest='ip', help='Chromecast IP address')
     sp_play.add_argument('--port', type=int, dest='port', help='ADB port')
-    sp_play.add_argument('--app', dest='app', help='App hint (youtube, tubi)')
+    sp_play.add_argument('--app', dest='app', help='App hint (youtube, tubi, or streaming app for fallback)')
+    sp_play.add_argument('--season', type=int, help='Season number for non-youtube/tubi fallback')
+    sp_play.add_argument('--episode', type=int, help='Episode number for non-youtube/tubi fallback')
     sp_play.set_defaults(func=play_cmd)
 
     sp_pause = sub.add_parser('pause')
