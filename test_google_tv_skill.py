@@ -455,3 +455,37 @@ class TestCacheOperations(unittest.TestCase):
         with patch('google_tv_skill.CACHE_FILE', self.cache_file):
             cache = load_cache()
             self.assertIsNone(cache)
+
+
+class TestPackageNames(unittest.TestCase):
+    """Test package name resolution from environment."""
+
+    def test_youtube_package_default(self):
+        """Test default YouTube package."""
+        with patch.dict(os.environ, {}, clear=True):
+            pkg = youtube_package()
+            self.assertEqual(pkg, "com.google.android.youtube.tv")
+
+    def test_youtube_package_override(self):
+        """Test YouTube package from YOUTUBE_PACKAGE env."""
+        with patch.dict(os.environ, {"YOUTUBE_PACKAGE": "com.custom.youtube"}):
+            pkg = youtube_package()
+            self.assertEqual(pkg, "com.custom.youtube")
+
+    def test_youtube_package_strips_whitespace(self):
+        """Test that package name whitespace is stripped."""
+        with patch.dict(os.environ, {"YOUTUBE_PACKAGE": "  com.custom.youtube  "}):
+            pkg = youtube_package()
+            self.assertEqual(pkg, "com.custom.youtube")
+
+    def test_tubi_package_default(self):
+        """Test default Tubi package."""
+        with patch.dict(os.environ, {}, clear=True):
+            pkg = tubi_package()
+            self.assertEqual(pkg, "com.tubitv")
+
+    def test_tubi_package_override(self):
+        """Test Tubi package from TUBI_PACKAGE env."""
+        with patch.dict(os.environ, {"TUBI_PACKAGE": "com.custom.tubi"}):
+            pkg = tubi_package()
+            self.assertEqual(pkg, "com.custom.tubi")
