@@ -1,5 +1,5 @@
 ---
-name: google_tv
+name: google-tv
 description: Play YouTube/Tubi content and fallback to Google TV global search for other streaming apps via ADB
 ---
 
