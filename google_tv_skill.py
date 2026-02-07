@@ -91,7 +91,7 @@ def save_cache(ip: str, port: int):
     try:
         CACHE_FILE.write_text(json.dumps({'ip': ip, 'port': int(port)}))
     except Exception as e:
-        ('Failed to write cache: %s', e)
+        print(f'Failed to write cache: {e}')
 
 def adb_available() -> bool:
     return bool(shutil.which('adb'))
