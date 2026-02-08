@@ -4,9 +4,8 @@ CLI tooling for controlling a Chromecast with Google TV over ADB. It plays YouTu
 
 ## Requirements
 
-- macOS/Linux host with `adb` and `uv` on PATH
+- macOS/Linux host with `adb`, `scrcpy`, `yt-api`, and `uv` in your PATH
 - Python 3.11+
-- Optional: `yt-api` CLI for resolving YouTube titles to video IDs
 
 ## Quick start
 
@@ -78,3 +77,4 @@ uv run test_google_tv_skill.py TestYouTubeIDExtraction
 
 - If `adb connect` fails, verify the current port: `adb connect IP:PORT`.
 - If connection is refused while running interactively, the CLI will prompt for a new port and update the cache on success.
+
