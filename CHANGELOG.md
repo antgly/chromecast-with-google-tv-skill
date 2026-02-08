@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.1.0/)
 and this project adheres to Semantic Versioning (https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-08
+
+### Added
+
+- Added `pair` command to run `adb pair` with explicit `--device` and `--pair-port` arguments.
+- Added optional `--code` support with interactive prompt fallback for pairing code entry.
+- Added unit tests for pairing helpers and `pair` command flow.
+
+### Changed
+
+- Documented that pairing uses a dedicated pairing port and does not auto-connect or update cache.
+- `play`, `pause`, and `resume` now offer interactive pairing when ADB connect fails due to authentication/unpaired state.
+- Adjusted pairing prompt timing to run after normal reconnect fallbacks, avoiding pair prompts for generic connectivity/IP/port drift issues.
+
 ## [1.0.3] - 2026-02-08
 
 ### Documentation
