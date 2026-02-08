@@ -11,6 +11,7 @@ CLI tooling for controlling a Chromecast with Google TV over ADB. It plays YouTu
 
 ```bash
 ./run status --device 192.168.4.64 --port 5555
+./run pair --device 192.168.4.64 --pair-port 37099 --code 123456
 ./run play "7m714Ls29ZA" --device 192.168.4.64 --port 5555
 ./run play "family guy" --app hulu --season 3 --episode 4 --device 192.168.4.64 --port 5555
 ./run pause --device 192.168.4.64 --port 5555
@@ -20,6 +21,7 @@ CLI tooling for controlling a Chromecast with Google TV over ADB. It plays YouTu
 ## Commands
 
 - `status`: show `adb devices` output
+- `pair --device <ip> --pair-port <port> [--code <pairing_code>]`: pair ADB over TCP/IP
 - `play <query_or_id_or_url>`: play via YouTube, Tubi, or global-search fallback
 - `pause`: send media pause
 - `resume`: send media play
@@ -32,6 +34,19 @@ The CLI accepts `--device` (IP) and `--port` (ADB port).
 - If neither is provided, the tool uses the last successful device from `.last_device.json`.
 - If no cache exists, it attempts ADB mDNS discovery and uses the first result.
 - No port scanning is performed. Only explicit, cached, or mDNS-provided ports are tried.
+
+## Pairing
+
+- Use `pair` when ADB requires re-pairing with a pairing code.
+- Pairing uses its own port (`--pair-port`) and does not assume the connect port.
+- `pair` only runs `adb pair`; it does not run `adb connect` and does not write `.last_device.json`.
+- During `play`, `pause`, and `resume`, if connect still fails with an authentication/unpaired error after normal reconnect fallbacks, the CLI will interactively offer to pair first, then retry connect.
+
+Example:
+
+```bash
+./run pair --device 192.168.4.64 --pair-port 37099 --code 123456
+```
 
 ## Content routing
 
@@ -76,5 +91,6 @@ uv run test_google_tv_skill.py TestYouTubeIDExtraction
 ## Troubleshooting
 
 - If `adb connect` fails, verify the current port: `adb connect IP:PORT`.
+- If pairing is required, run: `./run pair --device IP --pair-port PAIR_PORT --code PAIR_CODE`.
+- For `play`, `pause`, and `resume` in an interactive terminal, authentication errors will offer a guided pairing prompt automatically.
 - If connection is refused while running interactively, the CLI will prompt for a new port and update the cache on success.
-
