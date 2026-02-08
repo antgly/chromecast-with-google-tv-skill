@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog (https://keepachangelog.com/en/1.1.0/)
 and this project adheres to Semantic Versioning (https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-02-08
+
+### Documentation
+
+- Added an explicit execution policy to `SKILL.md` requiring command execution for pause/resume/status/play intents.
+- Documented that responses must not claim success unless command exit code is 0.
+- Documented failure handling requirements to return real command errors and next corrective steps.
+
+## [1.0.2] - 2026-02-08
+
+### Documentation
+
+- Tuned `SKILL.md` trigger metadata for reliability by requiring only `adb` and `uv` at selection time.
+- Added explicit Chromecast/Google TV intent-to-command mappings in `SKILL.md` to improve skill routing.
+- Clarified conditional runtime dependencies: `yt-api` is only needed for YouTube query resolution and `scrcpy` only for global-search fallback.
+
 ## [1.0.1] - 2026-02-08
 
 ### Documentation
