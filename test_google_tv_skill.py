@@ -22,6 +22,11 @@ from unittest.mock import patch, MagicMock
 import sys
 sys.path.insert(0, str(Path(__file__).parent))
 from google_tv_skill import (
+    adb_pair,
+    connection_needs_pairing,
+    pair_cmd,
+    prompt_for_pair_code,
+    try_prompt_pair_then_connect,
     extract_youtube_id,
     is_youtube_id,
     looks_like_tubi,
@@ -187,225 +192,16 @@ class TestConnectionRefusedDetection(unittest.TestCase):
         self.assertFalse(connection_refused(""))
 
 
-class TestCacheOperations(unittest.TestCase):
-    """Test cache file operations."""
+class TestPairingDetection(unittest.TestCase):
+    """Test detection of pairing/authentication failures."""
 
-    def setUp(self):
-        """Create temporary directory for cache testing."""
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.cache_file = Path(self.temp_dir.name) / '.last_device.json'
+    def test_connection_needs_pairing_true(self):
+        self.assertTrue(connection_needs_pairing("failed to authenticate to 192.168.1.9:5555"))
+        self.assertTrue(connection_needs_pairing("device unauthorized"))
 
-    def tearDown(self):
-        """Clean up temporary directory."""
-        self.temp_dir.cleanup()
-
-    def test_save_and_load_cache(self):
-        """Test saving and loading cache."""
-        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
-            save_cache("192.168.4.64", 5555)
-            cache = load_cache()
-            self.assertIsNotNone(cache)
-            self.assertEqual(cache['ip'], "192.168.4.64")
-            self.assertEqual(cache['port'], 5555)
-
-    def test_load_cache_nonexistent(self):
-        """Test loading cache when file doesn't exist."""
-        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
-            cache = load_cache()
-            self.assertIsNone(cache)
-
-    def test_load_cache_invalid_json(self):
-        """Test loading cache with invalid JSON."""
-        self.cache_file.write_text("not json")
-        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
-            cache = load_cache()
-            self.assertIsNone(cache)
-
-    def test_load_cache_missing_fields(self):
-        """Test loading cache with missing required fields."""
-        self.cache_file.write_text(json.dumps({"ip": "192.168.4.64"}))
-        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
-            cache = load_cache()
-            self.assertIsNone(cache)
-
-    def test_load_cache_invalid_port(self):
-        """Test loading cache with non-integer port."""
-        self.cache_file.write_text(json.dumps({"ip": "192.168.4.64", "port": "not-a-number"}))
-        with patch('google_tv_skill.CACHE_FILE', self.cache_file):
-            cache = load_cache()
-            self.assertIsNone(cache)
-
-
-class TestPackageNames(unittest.TestCase):
-    """Test package name resolution from environment."""
-
-    def test_youtube_package_default(self):
-        """Test default YouTube package."""
-        with patch.dict(os.environ, {}, clear=True):
-            pkg = youtube_package()
-            self.assertEqual(pkg, "com.google.android.youtube.tv")
-
-    def test_youtube_package_override(self):
-        """Test YouTube package from YOUTUBE_PACKAGE env."""
-        with patch.dict(os.environ, {"YOUTUBE_PACKAGE": "com.custom.youtube"}):
-            pkg = youtube_package()
-            self.assertEqual(pkg, "com.custom.youtube")
-
-    def test_youtube_package_strips_whitespace(self):
-        """Test that package name whitespace is stripped."""
-        with patch.dict(os.environ, {"YOUTUBE_PACKAGE": "  com.custom.youtube  "}):
-            pkg = youtube_package()
-            self.assertEqual(pkg, "com.custom.youtube")
-
-    def test_tubi_package_default(self):
-        """Test default Tubi package."""
-        with patch.dict(os.environ, {}, clear=True):
-            pkg = tubi_package()
-            self.assertEqual(pkg, "com.tubitv")
-
-    def test_tubi_package_override(self):
-        """Test Tubi package from TUBI_PACKAGE env."""
-        with patch.dict(os.environ, {"TUBI_PACKAGE": "com.custom.tubi"}):
-            pkg = tubi_package()
-            self.assertEqual(pkg, "com.custom.tubi")
-
-
-class TestVideoIDFinding(unittest.TestCase):
-    """Test recursive video ID extraction from JSON-like structures."""
-
-    def test_find_video_id_direct_key(self):
-        """Test finding videoId in dict."""
-        data = {"videoId": "7m714Ls29ZA", "title": "example"}
-        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
-
-    def test_find_video_id_underscore_key(self):
-        """Test finding video_id in dict."""
-        data = {"video_id": "7m714Ls29ZA"}
-        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
-
-    def test_find_video_id_nested_dict(self):
-        """Test finding videoId in nested dict."""
-        data = {"data": {"videoId": "7m714Ls29ZA"}}
-        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
-
-    def test_find_video_id_in_list(self):
-        """Test finding videoId in list of dicts."""
-        data = [{"title": "a"}, {"videoId": "7m714Ls29ZA"}]
-        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
-
-    def test_find_video_id_not_found(self):
-        """Test that None is returned when no videoId found."""
-        data = {"title": "example", "url": "https://example.com"}
-        self.assertIsNone(find_video_id(data))
-
-    def test_find_video_id_ignores_invalid_ids(self):
-        """Test that invalid IDs are skipped."""
-        data = {"videoId": "abc", "id": "7m714Ls29ZA"}
-        self.assertEqual(find_video_id(data), "7m714Ls29ZA")
-
-    def test_find_video_id_empty_structures(self):
-        """Test with empty structures."""
-        self.assertIsNone(find_video_id({}))
-        self.assertIsNone(find_video_id([]))
-
-
-if __name__ == '__main__':
-    unittest.main()
-
-
-class TestYouTubeIDValidation(unittest.TestCase):
-    """Test YouTube ID validation logic."""
-
-    def test_valid_id_11_chars(self):
-        """Test valid 11-char ID."""
-        self.assertTrue(is_youtube_id("7m714Ls29ZA"))
-
-    def test_valid_id_6_chars(self):
-        """Test valid 6-char ID (minimum)."""
-        self.assertTrue(is_youtube_id("abc123"))
-
-    def test_valid_id_with_underscore(self):
-        """Test valid ID with underscore."""
-        self.assertTrue(is_youtube_id("abc_123"))
-
-    def test_valid_id_with_hyphen(self):
-        """Test valid ID with hyphen."""
-        self.assertTrue(is_youtube_id("abc-123"))
-
-    def test_invalid_id_too_short(self):
-        """Test that IDs < 6 chars are invalid."""
-        self.assertFalse(is_youtube_id("abc12"))
-
-    def test_invalid_id_special_chars(self):
-        """Test that special characters make ID invalid."""
-        self.assertFalse(is_youtube_id("abc!@#$"))
-
-    def test_invalid_id_empty(self):
-        """Test that empty string is invalid."""
-        self.assertFalse(is_youtube_id(""))
-
-
-class TestTubiDetection(unittest.TestCase):
-    """Test Tubi URL detection logic."""
-
-    def test_tubi_https_url(self):
-        """Test detection of Tubi https URL."""
-        self.assertTrue(looks_like_tubi("https://www.tubitv.com/movies/123"))
-        self.assertTrue(looks_like_tubi("https://tubitv.com/movies/123"))
-
-    def test_tubi_without_https(self):
-        """Test detection of Tubi URL without https."""
-        self.assertTrue(looks_like_tubi("www.tubitv.com/movies/123"))
-        self.assertTrue(looks_like_tubi("tubitv.com/movies/123"))
-
-    def test_tubi_partial_match(self):
-        """Test that partial 'tubitv.com' in string is detected."""
-        self.assertTrue(looks_like_tubi("watch on tubitv.com here"))
-
-    def test_non_tubi_url(self):
-        """Test that non-Tubi URLs are rejected."""
-        self.assertFalse(looks_like_tubi("https://youtube.com"))
-        self.assertFalse(looks_like_tubi("https://hulu.com"))
-
-    def test_empty_tubi_input(self):
-        """Test that empty input returns False."""
-        self.assertFalse(looks_like_tubi(""))
-        self.assertFalse(looks_like_tubi(None))
-
-    def test_tubi_case_insensitive(self):
-        """Test that Tubi detection is case-insensitive."""
-        self.assertTrue(looks_like_tubi("HTTPS://WWW.TUBITV.COM/"))
-
-
-class TestConnectionRefusedDetection(unittest.TestCase):
-    """Test connection refused detection logic."""
-
-    def test_connection_refused_exact(self):
-        """Test detection of 'connection refused' message."""
-        self.assertTrue(connection_refused("connection refused"))
-
-    def test_refused_keyword(self):
-        """Test detection of 'refused' keyword."""
-        self.assertTrue(connection_refused("adb: unable to connect to 192.168.1.1:5555: refused"))
-
-    def test_failed_to_connect(self):
-        """Test detection of 'failed to connect' message."""
-        self.assertTrue(connection_refused("failed to connect to device"))
-
-    def test_cannot_connect(self):
-        """Test detection of 'cannot connect' message."""
-        self.assertTrue(connection_refused("cannot connect to device"))
-
-    def test_case_insensitive(self):
-        """Test that detection is case-insensitive."""
-        self.assertTrue(connection_refused("CONNECTION REFUSED"))
-        self.assertTrue(connection_refused("Failed To Connect"))
-
-    def test_not_connection_refused(self):
-        """Test that other errors are not detected as refused."""
-        self.assertFalse(connection_refused("timeout"))
-        self.assertFalse(connection_refused("device offline"))
-        self.assertFalse(connection_refused(""))
+    def test_connection_needs_pairing_false(self):
+        self.assertFalse(connection_needs_pairing("connection refused"))
+        self.assertFalse(connection_needs_pairing(""))
 
 
 class TestCacheOperations(unittest.TestCase):
@@ -528,6 +324,90 @@ class TestVideoIDFinding(unittest.TestCase):
         """Test with empty structures."""
         self.assertIsNone(find_video_id({}))
         self.assertIsNone(find_video_id([]))
+
+
+class TestPairing(unittest.TestCase):
+    """Test ADB pairing helpers and command flow."""
+
+    def test_adb_pair_success(self):
+        with patch('google_tv_skill.run_adb', return_value=(0, 'Successfully paired to 192.168.1.9:37099')):
+            ok, out = adb_pair('192.168.1.9', 37099, '123456')
+            self.assertTrue(ok)
+            self.assertIn('Successfully paired', out)
+
+    def test_adb_pair_failure(self):
+        with patch('google_tv_skill.run_adb', return_value=(1, 'Failed: invalid pairing code')):
+            ok, _ = adb_pair('192.168.1.9', 37099, '000000')
+            self.assertFalse(ok)
+
+    def test_prompt_for_pair_code_non_tty(self):
+        with patch('google_tv_skill.sys.stdin.isatty', return_value=False):
+            self.assertIsNone(prompt_for_pair_code('192.168.1.9', 37099))
+
+    def test_prompt_for_pair_code_accepts_numeric(self):
+        with patch('google_tv_skill.sys.stdin.isatty', return_value=True):
+            with patch('builtins.input', return_value='123456'):
+                self.assertEqual(prompt_for_pair_code('192.168.1.9', 37099), '123456')
+
+    def test_pair_cmd_missing_ip(self):
+        args = MagicMock(ip=None, pair_port=37099, code='123456')
+        rc = pair_cmd(args)
+        self.assertEqual(rc, 1)
+
+    def test_pair_cmd_missing_code_non_tty(self):
+        args = MagicMock(ip='192.168.1.9', pair_port=37099, code=None)
+        with patch('google_tv_skill.sys.stdin.isatty', return_value=False):
+            rc = pair_cmd(args)
+            self.assertEqual(rc, 1)
+
+    def test_pair_cmd_success(self):
+        args = MagicMock(ip='192.168.1.9', pair_port=37099, code='123456')
+        with patch('google_tv_skill.adb_pair', return_value=(True, 'Successfully paired')):
+            with patch('builtins.print'):
+                rc = pair_cmd(args)
+                self.assertEqual(rc, 0)
+
+    def test_pair_cmd_failure(self):
+        args = MagicMock(ip='192.168.1.9', pair_port=37099, code='123456')
+        with patch('google_tv_skill.adb_pair', return_value=(False, 'Failed')):
+            rc = pair_cmd(args)
+            self.assertEqual(rc, 2)
+
+    def test_try_prompt_pair_then_connect_non_tty_returns_guidance(self):
+        with patch('google_tv_skill.sys.stdin.isatty', return_value=False):
+            device, err = try_prompt_pair_then_connect(
+                '192.168.1.9',
+                5555,
+                'failed to authenticate to 192.168.1.9:5555',
+            )
+            self.assertIsNone(device)
+            self.assertIn('./run pair --device 192.168.1.9 --pair-port <PAIR_PORT> --code <PAIRING_CODE>', err)
+
+    def test_try_prompt_pair_then_connect_ignores_generic_connect_failure(self):
+        with patch('google_tv_skill.sys.stdin.isatty', return_value=True):
+            device, err = try_prompt_pair_then_connect(
+                '192.168.1.9',
+                5555,
+                'cannot connect to 192.168.1.9:5555',
+            )
+            self.assertIsNone(device)
+            self.assertIsNone(err)
+
+    def test_try_prompt_pair_then_connect_success(self):
+        with patch('google_tv_skill.sys.stdin.isatty', return_value=True):
+            with patch('google_tv_skill.prompt_yes_no', return_value=True):
+                with patch('google_tv_skill.prompt_for_pair_port', return_value=37099):
+                    with patch('google_tv_skill.prompt_for_pair_code', return_value='123456'):
+                        with patch('google_tv_skill.adb_pair', return_value=(True, 'Successfully paired')):
+                            with patch('google_tv_skill.adb_connect', return_value=(True, 'connected')):
+                                with patch('google_tv_skill.save_cache'):
+                                    device, err = try_prompt_pair_then_connect(
+                                        '192.168.1.9',
+                                        5555,
+                                        'failed to authenticate to 192.168.1.9:5555',
+                                    )
+                                    self.assertEqual(device, '192.168.1.9:5555')
+                                    self.assertIsNone(err)
 
 
 if __name__ == '__main__':
