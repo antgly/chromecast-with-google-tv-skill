@@ -13,6 +13,7 @@ or:       python3 -m pytest test_google_tv_skill.py (if pytest installed)
 
 import json
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,7 +32,66 @@ from google_tv_skill import (
     youtube_package,
     tubi_package,
     find_video_id,
+    adb_pair,
 )
+
+
+class TestADBPairing(unittest.TestCase):
+    """Test ADB pairing functionality."""
+
+    @patch('google_tv_skill.subprocess.run')
+    def test_adb_pair_success(self, mock_run):
+        """Test successful ADB pairing."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "Successfully paired to 192.168.1.100:12345"
+        mock_result.stderr = ""
+        mock_run.return_value = mock_result
+
+        success, output = adb_pair("192.168.1.100", 12345, "123456")
+
+        self.assertTrue(success)
+        self.assertIn("successfully paired", output.lower())
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        self.assertEqual(args[0], "adb")
+        self.assertEqual(args[1], "pair")
+        self.assertEqual(args[2], "192.168.1.100:12345")
+        self.assertEqual(args[3], "123456")
+
+    @patch('google_tv_skill.subprocess.run')
+    def test_adb_pair_failure(self, mock_run):
+        """Test failed ADB pairing."""
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = ""
+        mock_result.stderr = "Failed to pair: invalid code"
+        mock_run.return_value = mock_result
+
+        success, output = adb_pair("192.168.1.100", 12345, "999999")
+
+        self.assertFalse(success)
+        self.assertIn("invalid code", output.lower())
+
+    @patch('google_tv_skill.subprocess.run')
+    def test_adb_pair_timeout(self, mock_run):
+        """Test ADB pairing timeout."""
+        mock_run.side_effect = subprocess.TimeoutExpired('adb', 10)
+
+        success, output = adb_pair("192.168.1.100", 12345, "123456")
+
+        self.assertFalse(success)
+        self.assertIn("timed out", output.lower())
+
+    @patch('google_tv_skill.subprocess.run')
+    def test_adb_pair_adb_not_found(self, mock_run):
+        """Test ADB pairing when adb binary not found."""
+        mock_run.side_effect = FileNotFoundError()
+
+        success, output = adb_pair("192.168.1.100", 12345, "123456")
+
+        self.assertFalse(success)
+        self.assertEqual(output, 'adb not found on PATH')
 
 
 class TestYouTubeIDExtraction(unittest.TestCase):
