@@ -22,7 +22,7 @@ Notes:
 - Does NOT perform port scanning. It will attempt the explicit port passed or cached one.
 - Pairing: Use `pair` command to perform ADB wireless pairing with your Chromecast. This is a prerequisite before connecting.
   - Use --show-instructions to display detailed setup guide.
-  - After pairing, use the connection port (usually 5555) for other commands.
+  - After pairing, use the connection port shown on the Wireless debugging screen for other commands.
   - If connection is refused, the script will offer to retry or pair interactively (when running in a tty).
 - YouTube: prefers resolving to a video ID using the yt-api CLI (calls `yt-api` on PATH). If an ID is obtained, it launches the YouTube app via ADB intent restricted to the YouTube package.
 - Tubi: expects an https URL. The script will attempt a VIEW https intent restricted to the Tubi package.
@@ -97,11 +97,11 @@ To pair with your Chromecast with Google TV:
 4. Get the connection port:
    - After successful pairing, press BACK on the Chromecast remote
    - You'll see the Wireless debugging screen with IP address and port
-   - This port (usually 5555) is what you'll use for --port in other commands
-   - Example: ./run status --device 192.168.1.100 --port 5555
+   - This port is what you'll use for --port in other commands
+   - Example: ./run status --device 192.168.1.100 --port <CONNECTION_PORT>
 
 Note: Pairing only needs to be done once. After pairing, you can connect
-directly using the device IP and connection port (usually 5555).
+directly using the device IP and connection port shown on the Wireless debugging screen.
 
 If connection is refused, you may need to re-pair or verify that Wireless
 debugging is still enabled on the Chromecast.
@@ -433,13 +433,22 @@ def prompt_for_pairing(ip: str) -> Tuple[Optional[str], Optional[str]]:
             if ok:
                 print("Successfully paired!")
                 print("\nNow enter the connection port from the Wireless debugging screen")
-                print("(press BACK on the Chromecast remote to see it, usually 5555):")
+                print("(press BACK on the Chromecast remote to see it):")
                 try:
-                    connect_port_str = input(f"Connection port (default: 5555): ").strip() or "5555"
+                    connect_port_str = input(f"Connection port: ").strip()
+                    if not connect_port_str:
+                        print("Connection port is required.")
+                        continue
                     connect_port = int(connect_port_str)
-                except (ValueError, EOFError):
-                    print("Invalid port. Using 5555.")
-                    connect_port = 5555
+                    if not (1 <= connect_port <= 65535):
+                        print("Connection port must be between 1 and 65535.")
+                        continue
+                except ValueError:
+                    print("Invalid port value.")
+                    continue
+                except EOFError:
+                    print("Input cancelled.")
+                    continue
 
                 ok_connect, out_connect = adb_connect(pairing_ip, connect_port)
                 if ok_connect:
@@ -578,23 +587,27 @@ def pair_cmd(args) -> int:
         print("Successfully paired!")
         print("\nNext steps:")
         print("1. Press BACK on the Chromecast remote to return to Wireless debugging screen")
-        print("2. Note the IP address and port shown (usually port 5555)")
+        print("2. Note the IP address and port shown on that screen")
         print("3. Use these values to connect:")
-        print(f"   ./run status --device {args.pairing_ip} --port 5555")
+        print(f"   ./run status --device {args.pairing_ip} --port <CONNECTION_PORT>")
 
         # If cache should be updated with pairing IP and a chosen connection port
         if args.save_to_cache:
             if sys.stdin.isatty():
                 try:
-                    port_input = input("\nEnter connection port to save (default 5555): ").strip()
+                    port_input = input("\nEnter connection port to save: ").strip()
                 except EOFError:
                     port_input = ""
 
                 if not port_input:
-                    port = 5555
+                    print("Connection port is required; cache was not updated.")
+                    port = None
                 else:
                     try:
                         port = int(port_input)
+                        if not (1 <= port <= 65535):
+                            print("Connection port must be between 1 and 65535; cache was not updated.")
+                            port = None
                     except ValueError:
                         print("Invalid port value entered; cache was not updated.")
                         port = None

@@ -35,7 +35,7 @@ Before you can use this skill, you need to pair your Chromecast with ADB wireles
 
 4. **Get the connection port**:
    - After successful pairing, press BACK on the Chromecast remote
-   - You'll see the Wireless debugging screen with IP address and port (usually 5555)
+   - You'll see the Wireless debugging screen with IP address and port
    - Use these values for all other commands
 
 **Note**: Pairing only needs to be done once. After pairing, you can connect directly using the device IP and connection port.

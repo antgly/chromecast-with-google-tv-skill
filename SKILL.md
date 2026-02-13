@@ -25,7 +25,7 @@ Before using this skill, you must pair your Chromecast with ADB wireless debuggi
    - `./run pair --show-instructions` - Display detailed pairing instructions
    - `./run pair --pairing-ip <IP> --pairing-port <PORT> --pairing-code <CODE>` - Perform pairing
 
-After pairing once, you can use the connection port (usually 5555) for all other commands.
+After pairing once, you can use the connection port shown on the Wireless debugging screen for all other commands.
 
 ## Capabilities
 
