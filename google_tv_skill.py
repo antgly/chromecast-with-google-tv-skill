@@ -445,7 +445,9 @@ def prompt_for_pairing(ip: str) -> Tuple[Optional[str], Optional[str]]:
                 if ok_connect:
                     save_cache(pairing_ip, connect_port)
                     return f"{pairing_ip}:{connect_port}", None
-                return None, f'Pairing succeeded but connection failed: {out_connect.strip()}'
+                print(f"Pairing succeeded but connection failed: {out_connect.strip()}")
+                print("You can try a different connection port or select another option.")
+                continue
             else:
                 print(f"Pairing failed: {out.strip()}")
                 print("Please verify the pairing code and try again.")
