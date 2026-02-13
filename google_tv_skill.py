@@ -580,11 +580,31 @@ def pair_cmd(args) -> int:
         print("3. Use these values to connect:")
         print(f"   ./run status --device {args.pairing_ip} --port 5555")
 
-        # If cache should be updated with pairing IP and default port
+        # If cache should be updated with pairing IP and a chosen connection port
         if args.save_to_cache:
-            save_cache(args.pairing_ip, 5555)
-            print(f"\nSaved {args.pairing_ip}:5555 to cache.")
+            if sys.stdin.isatty():
+                try:
+                    port_input = input("\nEnter connection port to save (default 5555): ").strip()
+                except EOFError:
+                    port_input = ""
 
+                if not port_input:
+                    port = 5555
+                else:
+                    try:
+                        port = int(port_input)
+                    except ValueError:
+                        print("Invalid port value entered; cache was not updated.")
+                        port = None
+
+                if port is not None:
+                    save_cache(args.pairing_ip, port)
+                    print(f"\nSaved {args.pairing_ip}:{port} to cache.")
+            else:
+                print(
+                    "\nNon-interactive session detected; skipping cache update. "
+                    "Use --device and --port explicitly on future commands."
+                )
         return 0
     else:
         print(f"Pairing failed: {out.strip()}")
