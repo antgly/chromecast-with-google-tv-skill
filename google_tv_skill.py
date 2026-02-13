@@ -415,6 +415,9 @@ def prompt_for_pairing(ip: str) -> Tuple[Optional[str], Optional[str]]:
                     print("Pairing port is required.")
                     continue
                 pairing_port = int(pairing_port_str)
+                if not (1 <= pairing_port <= 65535):
+                    print("Pairing port must be between 1 and 65535.")
+                    continue
                 pairing_code = input("6-digit pairing code: ").strip()
                 if not pairing_code:
                     print("Pairing code is required.")
