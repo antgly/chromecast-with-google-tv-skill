@@ -117,7 +117,9 @@ def adb_pair(ip: str, port: int, code: str, timeout: int = ADB_TIMEOUT_SECONDS) 
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         out = (p.stdout or '') + (p.stderr or '')
-        success = p.returncode == 0 and ('successfully paired' in out.lower() or 'paired to' in out.lower())
+        # Treat adb's return code as the primary success indicator. The output may contain
+        # phrases like "Successfully paired" or "paired to", but that is not required.
+        success = p.returncode == 0
         return success, out
     except FileNotFoundError:
         return False, 'adb not found on PATH'
